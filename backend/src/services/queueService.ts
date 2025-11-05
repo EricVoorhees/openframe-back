@@ -91,7 +91,7 @@ export const agentTaskWorker = new Worker<Task>(
 
       // Update task with results
       task.status = 'done';
-      task.result = result.result;
+      task.result = result.result as TaskResult;
       task.metrics = {
         tokens: result.metrics?.tokens || 0,
         llmProvider: config.LLM_PROVIDER,

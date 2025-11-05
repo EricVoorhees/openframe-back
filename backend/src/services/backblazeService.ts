@@ -68,7 +68,7 @@ class BackblazeService {
     } catch (error) {
       logger.error('Failed to download file from B2', { key, error });
       
-      if (error instanceof AWS.AWSError && error.statusCode === 404) {
+      if (error && typeof error === 'object' && 'statusCode' in error && error.statusCode === 404) {
         throw new AppError('File not found', 404);
       }
       

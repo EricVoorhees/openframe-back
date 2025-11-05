@@ -109,7 +109,7 @@ class HumanLayerClient {
       return {
         ...response,
         metrics: {
-          ...response.metrics,
+          tokens: response.metrics?.tokens || 0,
           durationMs,
         },
       };
