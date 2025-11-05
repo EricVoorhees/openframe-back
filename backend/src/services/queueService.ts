@@ -13,6 +13,14 @@ const connection = new Redis({
   password: config.REDIS_PASSWORD,
   maxRetriesPerRequest: null, // Required for BullMQ
   enableReadyCheck: false,
+  retryStrategy: (times) => {
+    if (times > 3) {
+      logger.error('Redis connection failed after 3 retries, giving up');
+      return null; // Stop retrying
+    }
+    const delay = Math.min(times * 50, 2000);
+    return delay;
+  },
 });
 
 connection.on('error', (err) => {
@@ -21,6 +29,10 @@ connection.on('error', (err) => {
 
 connection.on('connect', () => {
   logger.info('Redis queue connection established');
+});
+
+connection.on('ready', () => {
+  logger.info('Redis queue ready');
 });
 
 // Task queue for agent operations
