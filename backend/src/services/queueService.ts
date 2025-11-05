@@ -52,15 +52,14 @@ try {
     isRedisConnected = false;
   });
 
-  // Attempt to connect (non-blocking)
-  connection.connect().catch((err) => {
-    logger.error('Failed to connect to Redis on startup', { 
-      error: err.message || 'Unknown error',
-      host: config.REDIS_HOST,
-      port: config.REDIS_PORT
-    });
-    // Don't throw - let the app continue without Redis
-  });
+  // DON'T attempt to connect yet - completely lazy
+  // connection.connect().catch((err) => {
+  //   logger.error('Failed to connect to Redis on startup', { 
+  //     error: err.message || 'Unknown error',
+  //     host: config.REDIS_HOST,
+  //     port: config.REDIS_PORT
+  //   });
+  // });
 
 } catch (error) {
   logger.error('Failed to initialize Redis connection', { error });

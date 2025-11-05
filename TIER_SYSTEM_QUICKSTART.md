@@ -268,6 +268,7 @@ See **[TIER_SYSTEM_GUIDE.md](./TIER_SYSTEM_GUIDE.md)** for complete details.
 - [ ] Stripe webhook configured (if using Stripe)
 - [ ] Frontend checks tier before showing AI features
 - [ ] Error handling shows upgrade prompts
+      render components compped
 
 ---
 
