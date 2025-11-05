@@ -6,34 +6,67 @@ import { Task, TaskResult } from '../types/index.js';
 import humanlayerClient from './humanlayerClient.js';
 import auditService from './auditService.js';
 
-// Create Redis connection for BullMQ
-const connection = new Redis({
-  host: config.REDIS_HOST,
-  port: config.REDIS_PORT,
-  password: config.REDIS_PASSWORD,
-  maxRetriesPerRequest: null, // Required for BullMQ
-  enableReadyCheck: false,
-  retryStrategy: (times) => {
-    if (times > 3) {
-      logger.error('Redis connection failed after 3 retries, giving up');
-      return null; // Stop retrying
-    }
-    const delay = Math.min(times * 50, 2000);
-    return delay;
-  },
-});
+// Create Redis connection for BullMQ with graceful error handling
+let connection: Redis;
+let isRedisConnected = false;
 
-connection.on('error', (err) => {
-  logger.error('Redis queue connection error', { error: err });
-});
+try {
+  connection = new Redis({
+    host: config.REDIS_HOST,
+    port: config.REDIS_PORT,
+    password: config.REDIS_PASSWORD,
+    maxRetriesPerRequest: null, // Required for BullMQ
+    enableReadyCheck: false,
+    lazyConnect: true, // Don't connect immediately
+    retryStrategy: (times) => {
+      if (times > 3) {
+        logger.warn('Redis connection failed after 3 retries, queue features will be unavailable');
+        return null; // Stop retrying
+      }
+      const delay = Math.min(times * 50, 2000);
+      return delay;
+    },
+  });
 
-connection.on('connect', () => {
-  logger.info('Redis queue connection established');
-});
+  connection.on('error', (err) => {
+    logger.error('Redis queue connection error', { 
+      error: err.message || 'Unknown error',
+      host: config.REDIS_HOST,
+      port: config.REDIS_PORT
+    });
+    isRedisConnected = false;
+  });
 
-connection.on('ready', () => {
-  logger.info('Redis queue ready');
-});
+  connection.on('connect', () => {
+    logger.info('Redis queue connection established');
+    isRedisConnected = true;
+  });
+
+  connection.on('ready', () => {
+    logger.info('Redis queue ready');
+    isRedisConnected = true;
+  });
+
+  connection.on('close', () => {
+    logger.warn('Redis connection closed');
+    isRedisConnected = false;
+  });
+
+  // Attempt to connect (non-blocking)
+  connection.connect().catch((err) => {
+    logger.error('Failed to connect to Redis on startup', { 
+      error: err.message || 'Unknown error',
+      host: config.REDIS_HOST,
+      port: config.REDIS_PORT
+    });
+    // Don't throw - let the app continue without Redis
+  });
+
+} catch (error) {
+  logger.error('Failed to initialize Redis connection', { error });
+  // Create a dummy connection that won't be used
+  connection = new Redis({ lazyConnect: true, maxRetriesPerRequest: null });
+}
 
 // Task queue for agent operations
 export const agentTaskQueue = new Queue<Task>('agent-tasks', {
