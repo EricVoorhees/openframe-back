@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - HOST=0.0.0.0
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - HUMANLAYER_DAEMON_URL=http://humanlayer:7777
+    env_file:
+      - ./backend/.env
+    depends_on:
+      - redis
+      - humanlayer
+    restart: unless-stopped
+    networks:
+      - app-network
+    volumes:
+      - ./backend/logs:/app/logs
+
+  # HumanLayer Daemon
+  humanlayer:
+    build:
+      context: ./humanlayer/hld
+      dockerfile: Dockerfile
+    ports:
+      - "7777:7777"
+    environment:
+      - HUMANLAYER_DAEMON_HTTP_PORT=7777
+      - HUMANLAYER_DAEMON_HTTP_HOST=0.0.0.0
+    restart: unless-stopped
+    networks:
+      - app-network
+    volumes:
+      - humanlayer-data:/data
+
+  # Redis for queue and rate limiting
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    networks:
+      - app-network
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # Optional: Redis Commander for debugging
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - app-network
+    profiles:
+      - debug
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+  humanlayer-data:
+
