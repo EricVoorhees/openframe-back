@@ -2,7 +2,7 @@ import { Queue, Worker, Job } from 'bullmq';
 import Redis from 'ioredis';
 import config from '../config/index.js';
 import logger from '../utils/logger.js';
-import { Task } from '../types/index.js';
+import { Task, TaskResult } from '../types/index.js';
 import humanlayerClient from './humanlayerClient.js';
 import auditService from './auditService.js';
 
