@@ -1,0 +1,67 @@
+# Dockerfile for React Web UI
+# Simplified build that works from repo root
+
+FROM oven/bun:1.2.23-alpine AS builder
+
+WORKDIR /app
+
+# Copy workspace files first
+COPY package.json bun.lock* ./
+
+# Copy the database package (workspace dependency)
+COPY packages/database ./packages/database
+
+# Copy the React app
+COPY apps/react/package.json ./apps/react/
+COPY apps/react/src ./apps/react/src
+COPY apps/react/styles ./apps/react/styles
+COPY apps/react/*.ts ./apps/react/
+COPY apps/react/*.json ./apps/react/
+COPY apps/react/*.toml ./apps/react/
+
+# Install dependencies and build
+WORKDIR /app/apps/react
+RUN bun install
+RUN bun run build
+
+# Production stage
+FROM oven/bun:1.2.23-alpine
+
+# Install curl for health checks
+RUN apk add --no-cache curl
+
+WORKDIR /app
+
+# Copy workspace files (needed for runtime)
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/packages/database ./packages/database
+
+# Copy the React app to apps/react
+COPY --from=builder /app/apps/react ./apps/react
+
+# Install production dependencies (including workspace deps)
+WORKDIR /app
+RUN bun install --production --frozen-lockfile || bun install --production
+
+# Use existing bun user (already in base image)
+RUN chown -R bun:bun /app
+
+USER bun
+
+# Set working directory to react app
+WORKDIR /app/apps/react
+
+# Environment variables
+ENV NODE_ENV=production \
+    PORT=4000
+
+# Expose port
+EXPOSE 4000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:4000/ || exit 1
+
+# Start the application from the react app directory
+CMD ["bun", "--cwd", "/app/apps/react", "start"]
+

@@ -1,0 +1,77 @@
+# Render Blueprint for HumanLayer Backend
+# This file defines the infrastructure for deploying HumanLayer on Render.com
+# 
+# Quick Deploy:
+#   1. Fork/clone this repository
+#   2. Connect your GitHub repo to Render
+#   3. Render will automatically detect this file and set up your services
+#   4. Add required environment variables in the Render dashboard
+#
+# Learn more: https://render.com/docs/blueprint-spec
+
+services:
+  # Main HumanLayer Daemon API Service
+  - type: web
+    name: humanlayer-daemon
+    runtime: docker
+    plan: starter  # Change to 'standard' or 'pro' for production workloads
+    region: oregon  # Change to your preferred region
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    
+    # Health check configuration
+    healthCheckPath: /api/v1/health
+    
+    # Auto-deploy on push to main
+    autoDeploy: true
+    
+    # Environment variables
+    envVars:
+      # Database configuration
+      - key: HUMANLAYER_DATABASE_PATH
+        value: /app/data/daemon.db
+      
+      # HTTP server configuration
+      # Render automatically sets PORT - the app will read it via config
+      - key: HUMANLAYER_DAEMON_HTTP_HOST
+        value: 0.0.0.0
+      
+      # Node environment
+      - key: NODE_ENV
+        value: production
+      
+      # Optional: API keys and secrets (set these in Render dashboard)
+      # - key: ANTHROPIC_API_KEY
+      #   sync: false  # Sync from Render's environment group
+      
+      # Optional: Custom configuration
+      # - key: HUMANLAYER_DAEMON_VERSION_OVERRIDE
+      #   value: production
+      
+      # Logging configuration
+      - key: LOG_LEVEL
+        value: info
+    
+    # Persistent disk for database (SQLite)
+    disk:
+      name: humanlayer-data
+      mountPath: /app/data
+      sizeGB: 10  # Adjust based on expected data volume
+
+# Optional: PostgreSQL database (if you want to migrate from SQLite)
+# Uncomment this section if you prefer PostgreSQL over SQLite
+# databases:
+#   - name: humanlayer-db
+#     plan: starter  # free tier available
+#     databaseName: humanlayer
+#     user: humanlayer
+#     region: oregon
+
+# Optional: Redis for caching/session storage
+# Uncomment if you need Redis
+# - type: redis
+#   name: humanlayer-cache
+#   plan: starter  # free tier available
+#   maxmemoryPolicy: allkeys-lru
+#   region: oregon
+
