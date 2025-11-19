@@ -1,6 +1,6 @@
 # Dependencies
 node_modules/
-package-lock.json
+# package-lock.json - Keep for Docker builds
 bun.lock
 
 # Environment variables

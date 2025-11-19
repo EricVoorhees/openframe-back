@@ -17,7 +17,7 @@ WORKDIR /app
 
 COPY backend/package*.json ./
 
-RUN npm ci --only=production
+RUN npm ci --omit=dev
 
 COPY --from=builder /app/backend/dist ./dist
 
