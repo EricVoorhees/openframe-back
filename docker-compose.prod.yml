@@ -1,0 +1,123 @@
+# Production-like Docker Compose setup for local testing
+# This mimics the Render.com deployment environment locally
+#
+# Usage:
+#   docker-compose -f docker-compose.prod.yml up --build
+#
+# Access:
+#   - API: http://localhost:7777/api/v1/health
+#   - PostgreSQL: localhost:5432 (if enabled)
+#   - Electric SQL: http://localhost:3000 (if enabled)
+
+version: '3.8'
+
+services:
+  # Main HumanLayer Daemon service
+  humanlayer-daemon:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: humanlayer-daemon
+    ports:
+      - "7777:7777"
+    environment:
+      # Database
+      - HUMANLAYER_DATABASE_PATH=/app/data/daemon.db
+      
+      # HTTP Server
+      - HUMANLAYER_DAEMON_HTTP_PORT=7777
+      - HUMANLAYER_DAEMON_HTTP_HOST=0.0.0.0
+      
+      # Logging
+      - LOG_LEVEL=debug
+      - NODE_ENV=production
+      
+      # Optional: uncomment and set if using PostgreSQL
+      # - DATABASE_URL=postgresql://postgres:password@postgres:5432/humanlayer?sslmode=disable
+      
+      # Optional: uncomment and set if using Electric SQL
+      # - ELECTRIC_URL=http://electric:3000
+    volumes:
+      # Persistent data volume
+      - humanlayer-data:/app/data
+      # Optional: mount logs for debugging
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7777/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - humanlayer-network
+
+  # Optional: PostgreSQL database
+  # Uncomment this section if you want to use PostgreSQL instead of SQLite
+  # postgres:
+  #   image: postgres:17-alpine
+  #   container_name: humanlayer-postgres
+  #   environment:
+  #     POSTGRES_DB: humanlayer
+  #     POSTGRES_USER: postgres
+  #     POSTGRES_PASSWORD: password
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - postgres-data:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U postgres"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #   networks:
+  #     - humanlayer-network
+  #   restart: unless-stopped
+
+  # Optional: Electric SQL for real-time sync
+  # Uncomment this section if you want real-time database sync capabilities
+  # electric:
+  #   image: electricsql/electric:latest
+  #   container_name: humanlayer-electric
+  #   environment:
+  #     DATABASE_URL: postgresql://postgres:password@postgres:5432/humanlayer?sslmode=disable
+  #     ELECTRIC_INSECURE: "true"  # Only for development
+  #   ports:
+  #     - "3000:3000"
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #   networks:
+  #     - humanlayer-network
+  #   restart: unless-stopped
+
+  # Optional: Redis for caching
+  # Uncomment if you need Redis
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: humanlayer-redis
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis-data:/data
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #   networks:
+  #     - humanlayer-network
+  #   restart: unless-stopped
+
+volumes:
+  humanlayer-data:
+    driver: local
+  # postgres-data:
+  #   driver: local
+  # redis-data:
+  #   driver: local
+
+networks:
+  humanlayer-network:
+    driver: bridge
+

@@ -1,0 +1,106 @@
+# Multi-stage Dockerfile for HumanLayer Daemon (hld) production deployment
+# Optimized for Render.com deployment with health checks and proper signal handling
+
+# Stage 1: Build Go backend
+FROM golang:1.24-alpine AS go-builder
+
+# Install build dependencies
+RUN apk add --no-cache git gcc musl-dev sqlite-dev
+
+WORKDIR /build
+
+# Copy go modules files first for better caching
+COPY go.work* ./
+COPY hld/go.mod hld/go.sum ./hld/
+COPY claudecode-go/go.mod claudecode-go/go.sum ./claudecode-go/
+
+# Download dependencies
+WORKDIR /build/hld
+RUN go mod download
+
+# Copy source code
+WORKDIR /build
+COPY hld ./hld
+COPY claudecode-go ./claudecode-go
+
+# Build the daemon binary
+WORKDIR /build/hld
+RUN CGO_ENABLED=1 GOOS=linux go build \
+    -ldflags="-w -s -X github.com/humanlayer/humanlayer/hld/internal/version.BuildVersion=$(git describe --tags --always --dirty 2>/dev/null || echo 'production')" \
+    -o hld ./cmd/hld
+
+# Stage 2: Build Node.js components (hlyr CLI)
+FROM oven/bun:1.2.23-alpine AS node-builder
+
+WORKDIR /build
+
+# Copy package files
+COPY package.json bun.lock* ./
+COPY hlyr/package.json ./hlyr/
+COPY hld/sdk/typescript/package.json ./hld/sdk/typescript/
+
+# Install dependencies (including dev dependencies for build)
+RUN bun install --no-save
+
+# Copy source and build
+COPY hlyr ./hlyr
+COPY hld/sdk ./hld/sdk
+
+# Build hlyr CLI
+WORKDIR /build/hlyr
+RUN bun run build
+
+# Build TypeScript SDK
+WORKDIR /build/hld/sdk/typescript
+RUN bun run build
+
+# Stage 3: Production runtime
+FROM alpine:3.19
+
+# Install runtime dependencies
+RUN apk add --no-cache \
+    ca-certificates \
+    sqlite-libs \
+    nodejs \
+    npm \
+    curl \
+    tzdata \
+    && addgroup -g 1000 humanlayer \
+    && adduser -D -u 1000 -G humanlayer humanlayer
+
+# Set working directory
+WORKDIR /app
+
+# Copy built binaries from builders
+COPY --from=go-builder /build/hld/hld /app/hld
+COPY --from=node-builder /build/hlyr/dist /app/hlyr
+COPY --from=node-builder /build/hld/sdk/typescript/dist /app/sdk
+
+# Create necessary directories with proper permissions
+RUN mkdir -p /app/data /app/logs \
+    && chown -R humanlayer:humanlayer /app
+
+# Copy startup script
+COPY scripts/start-production.sh /app/start.sh
+RUN chmod +x /app/start.sh
+
+# Switch to non-root user
+USER humanlayer
+
+# Environment variables with sensible defaults
+ENV HUMANLAYER_DATABASE_PATH=/app/data/daemon.db \
+    HUMANLAYER_DAEMON_HTTP_PORT=7777 \
+    HUMANLAYER_DAEMON_HTTP_HOST=0.0.0.0 \
+    NODE_ENV=production \
+    PORT=7777
+
+# Expose HTTP port
+EXPOSE 7777
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:7777/api/v1/health || exit 1
+
+# Start the daemon
+CMD ["/app/start.sh"]
+
