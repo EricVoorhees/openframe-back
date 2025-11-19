@@ -252,6 +252,34 @@ class AuditService {
   }
 
   /**
+   * Log generic action (for log analysis and other features)
+   */
+  async logAction(
+    userId: string,
+    projectId: string,
+    action: string,
+    metadata?: Record<string, unknown>
+  ): Promise<void> {
+    const log: AuditLog = {
+      id: uuidv4(),
+      userId,
+      projectId,
+      taskId: '', // Not all actions are task-related
+      action: action as any, // Extend the action type as needed
+      timestamp: new Date(),
+      metadata,
+    };
+
+    auditLogs.set(log.id, log);
+    logger.info('Generic action audit log', { 
+      logId: log.id, 
+      action,
+      userId,
+      projectId,
+    });
+  }
+
+  /**
    * Clear old audit logs (cleanup job)
    */
   async cleanupOldLogs(daysToKeep: number = 90): Promise<number> {

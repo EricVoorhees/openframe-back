@@ -178,3 +178,54 @@ export interface UserQuota {
   resetDate: Date;
 }
 
+// ============================================================================
+// Log Analysis Types
+// ============================================================================
+
+export const UniqueErrorSchema = z.object({
+  error_type: z.string(),
+  message: z.string(),
+  count: z.number(),
+  frequency_pattern: z.string(),
+});
+
+export const CriticalLogSchema = z.object({
+  timestamp: z.string(),
+  level: z.string(),
+  message: z.string(),
+  frame_name: z.string(),
+});
+
+export const NetworkSummarySchema = z.object({
+  total_requests: z.number(),
+  success_rate: z.number(),
+  failed_requests: z.number(),
+});
+
+export const PerformanceAlertSchema = z.object({
+  severity: z.string(),
+  message: z.string(),
+  duration_ms: z.number(),
+});
+
+export const LogSummarySchema = z.object({
+  summary_id: z.string(),
+  session_id: z.string(),
+  total_logs: z.number(),
+  error_count: z.number(),
+  warn_count: z.number(),
+  unique_errors: z.array(UniqueErrorSchema),
+  critical_logs: z.array(CriticalLogSchema),
+  network_summary: NetworkSummarySchema,
+  performance_alerts: z.array(PerformanceAlertSchema),
+});
+
+export const LogAnalysisResponseSchema = z.object({
+  narrative: z.string(),
+  key_insights: z.array(z.string()),
+  recommendations: z.array(z.string()),
+});
+
+export type LogSummary = z.infer<typeof LogSummarySchema>;
+export type LogAnalysisResponse = z.infer<typeof LogAnalysisResponseSchema>;
+

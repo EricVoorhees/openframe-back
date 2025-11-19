@@ -222,6 +222,33 @@ and potential bugs. Provide a patch that fixes these issues while maintaining fu
       throw new AppError('Failed to validate directory', 500);
     }
   }
+
+  /**
+   * Analyze logs using HumanLayer AI agent
+   */
+  async analyzeLogs(logSummary: any): Promise<any> {
+    try {
+      logger.info('Analyzing logs via HumanLayer', {
+        summary_id: logSummary.summary_id,
+        total_logs: logSummary.total_logs,
+        errors: logSummary.error_count,
+      });
+
+      // Call the HumanLayer daemon's log analysis endpoint
+      const response = await this.client.post('/rpc/logs.analyze', logSummary);
+      
+      logger.info('Log analysis completed', {
+        summary_id: logSummary.summary_id,
+        narrative_length: response.data.narrative?.length || 0,
+        insights_count: response.data.key_insights?.length || 0,
+      });
+
+      return response.data;
+    } catch (error) {
+      logger.error('Failed to analyze logs', { error });
+      throw new AppError('Failed to analyze logs', 500);
+    }
+  }
 }
 
 export default new HumanLayerClient();

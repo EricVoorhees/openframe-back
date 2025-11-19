@@ -13,6 +13,7 @@ import agentRoutes from './routes/agent.js';
 import projectRoutes from './routes/projects.js';
 import adminRoutes from './routes/admin.js';
 import webhookRoutes from './routes/webhooks.js';
+import logsRoutes from './routes/logs.js';
 
 const app: Express = express();
 
@@ -57,6 +58,7 @@ app.use('/api/webhooks', webhookRoutes);
 // API routes (with auth and rate limiting)
 app.use('/api/agent', apiRateLimiter, agentTaskRateLimiter, verifyFirebaseToken, agentRoutes);
 app.use('/api/projects', apiRateLimiter, verifyFirebaseToken, projectRoutes);
+app.use('/api/logs', apiRateLimiter, verifyFirebaseToken, logsRoutes);
 
 // Admin routes (service key auth only, no Firebase token needed)
 app.use('/api/admin', adminRoutes);
@@ -71,6 +73,7 @@ app.get('/', (req, res) => {
       health: '/health',
       agent: '/api/agent',
       projects: '/api/projects',
+      logs: '/api/logs',
     },
   });
 });
