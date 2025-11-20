@@ -68,28 +68,32 @@ try {
 }
 
 // Task queue for agent operations
-export const agentTaskQueue = new Queue<Task>('agent-tasks', {
-  connection,
-  defaultJobOptions: {
-    attempts: config.QUEUE_MAX_RETRIES,
-    backoff: {
-      type: 'exponential',
-      delay: 2000,
-    },
-    removeOnComplete: {
-      age: 3600 * 24, // Keep completed jobs for 24 hours
-      count: 1000,
-    },
-    removeOnFail: {
-      age: 3600 * 24 * 7, // Keep failed jobs for 7 days
-    },
-  },
-});
+let agentTaskQueue: Queue<Task> | null = null;
+let agentTaskWorker: Worker<Task> | null = null;
 
-// Worker to process agent tasks
-export const agentTaskWorker = new Worker<Task>(
-  'agent-tasks',
-  async (job: Job<Task>) => {
+try {
+  agentTaskQueue = new Queue<Task>('agent-tasks', {
+    connection,
+    defaultJobOptions: {
+      attempts: config.QUEUE_MAX_RETRIES,
+      backoff: {
+        type: 'exponential',
+        delay: 2000,
+      },
+      removeOnComplete: {
+        age: 3600 * 24, // Keep completed jobs for 24 hours
+        count: 1000,
+      },
+      removeOnFail: {
+        age: 3600 * 24 * 7, // Keep failed jobs for 7 days
+      },
+    },
+  });
+
+  // Worker to process agent tasks
+  agentTaskWorker = new Worker<Task>(
+    'agent-tasks',
+    async (job: Job<Task>) => {
     const task = job.data;
     
     logger.info('Processing agent task', {
@@ -186,25 +190,34 @@ export const agentTaskWorker = new Worker<Task>(
       duration: 1000, // 10 jobs per second max
     },
   }
-);
+  );
 
-// Event listeners for the worker
-agentTaskWorker.on('completed', (job) => {
-  logger.info('Job completed', { jobId: job.id });
-});
+  // Event listeners for the worker
+  agentTaskWorker.on('completed', (job) => {
+    logger.info('Job completed', { jobId: job.id });
+  });
 
-agentTaskWorker.on('failed', (job, err) => {
-  logger.error('Job failed', { jobId: job?.id, error: err });
-});
+  agentTaskWorker.on('failed', (job, err) => {
+    logger.error('Job failed', { jobId: job?.id, error: err });
+  });
 
-agentTaskWorker.on('error', (err) => {
-  logger.error('Worker error', { error: err });
-});
+  agentTaskWorker.on('error', (err) => {
+    logger.error('Worker error', { error: err });
+  });
+
+  logger.info('BullMQ queue and worker initialized successfully');
+} catch (error) {
+  logger.warn('BullMQ queue/worker initialization failed - queue features will be unavailable', { 
+    error: error instanceof Error ? error.message : 'Unknown error' 
+  });
+}
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
   logger.info('SIGTERM received, closing worker...');
-  await agentTaskWorker.close();
+  if (agentTaskWorker) {
+    await agentTaskWorker.close();
+  }
   await connection.quit();
 });
 
@@ -213,6 +226,10 @@ export class QueueService {
    * Add a task to the queue
    */
   async enqueueTask(task: Task): Promise<string> {
+    if (!agentTaskQueue) {
+      throw new Error('Queue service not available - Redis connection failed');
+    }
+    
     try {
       const job = await agentTaskQueue.add(`task-${task.id}`, task, {
         jobId: task.id,
@@ -230,6 +247,11 @@ export class QueueService {
    * Get task status from queue
    */
   async getTaskStatus(taskId: string): Promise<Task | null> {
+    if (!agentTaskQueue) {
+      logger.warn('Queue not available, cannot get task status', { taskId });
+      return null;
+    }
+    
     try {
       const job = await agentTaskQueue.getJob(taskId);
       
@@ -262,6 +284,11 @@ export class QueueService {
    * Cancel a task
    */
   async cancelTask(taskId: string): Promise<boolean> {
+    if (!agentTaskQueue) {
+      logger.warn('Queue not available, cannot cancel task', { taskId });
+      return false;
+    }
+    
     try {
       const job = await agentTaskQueue.getJob(taskId);
       
@@ -282,6 +309,16 @@ export class QueueService {
    * Get queue metrics
    */
   async getQueueMetrics() {
+    if (!agentTaskQueue) {
+      return {
+        waiting: 0,
+        active: 0,
+        completed: 0,
+        failed: 0,
+        available: false,
+      };
+    }
+    
     try {
       const [waiting, active, completed, failed] = await Promise.all([
         agentTaskQueue.getWaitingCount(),
@@ -305,4 +342,5 @@ export class QueueService {
 }
 
 export default new QueueService();
+export { agentTaskQueue, agentTaskWorker };
 

@@ -8,29 +8,49 @@ class AIService {
   private anthropic?: Anthropic;
   private openai?: OpenAI;
   private provider: 'openai' | 'anthropic';
+  private initialized: boolean = false;
 
   constructor() {
     this.provider = config.LLM_PROVIDER;
 
-    if (this.provider === 'anthropic' && config.ANTHROPIC_API_KEY) {
-      this.anthropic = new Anthropic({
-        apiKey: config.ANTHROPIC_API_KEY,
-      });
-    } else if (this.provider === 'openai' && config.OPENAI_API_KEY) {
-      this.openai = new OpenAI({
-        apiKey: config.OPENAI_API_KEY,
-      });
-    } else {
-      throw new Error(`AI provider ${this.provider} not configured`);
+    try {
+      if (this.provider === 'anthropic' && config.ANTHROPIC_API_KEY) {
+        this.anthropic = new Anthropic({
+          apiKey: config.ANTHROPIC_API_KEY,
+        });
+        this.initialized = true;
+        logger.info('AI Service initialized', { provider: this.provider });
+      } else if (this.provider === 'openai' && config.OPENAI_API_KEY) {
+        this.openai = new OpenAI({
+          apiKey: config.OPENAI_API_KEY,
+        });
+        this.initialized = true;
+        logger.info('AI Service initialized', { provider: this.provider });
+      } else {
+        logger.warn('AI Service not configured - missing API key', { 
+          provider: this.provider,
+          hasAnthropicKey: !!config.ANTHROPIC_API_KEY,
+          hasOpenAIKey: !!config.OPENAI_API_KEY,
+        });
+      }
+    } catch (error) {
+      logger.error('Failed to initialize AI Service', { error, provider: this.provider });
     }
-
-    logger.info('AI Service initialized', { provider: this.provider });
   }
 
   /**
    * Analyze logs using AI
    */
   async analyzeLogs(logSummary: LogSummary): Promise<LogAnalysisResponse> {
+    // Check if AI service is initialized
+    if (!this.initialized) {
+      logger.warn('AI Service not initialized, using fallback response', {
+        provider: this.provider,
+        summary_id: logSummary.summary_id,
+      });
+      return this.generateFallbackResponse(logSummary);
+    }
+
     logger.info('Analyzing logs with AI', {
       provider: this.provider,
       summary_id: logSummary.summary_id,
