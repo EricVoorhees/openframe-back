@@ -137,8 +137,12 @@ process.on('uncaughtException', (error) => {
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  logger.error('Unhandled rejection', { reason, promise });
-  process.exit(1);
+  logger.error('Unhandled rejection', { 
+    reason: reason instanceof Error ? { message: reason.message, stack: reason.stack } : reason,
+    promiseString: promise?.toString(),
+  });
+  // Don't exit immediately - log and continue for now to identify the issue
+  logger.warn('Continuing despite unhandled rejection...');
 });
 
 export default app;

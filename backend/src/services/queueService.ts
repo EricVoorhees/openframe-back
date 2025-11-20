@@ -31,6 +31,7 @@ try {
   connection.on('error', (err) => {
     logger.error('Redis queue connection error', { 
       error: err.message || 'Unknown error',
+      errorType: err.constructor.name,
       host: config.REDIS_HOST,
       port: config.REDIS_PORT
     });
@@ -49,6 +50,15 @@ try {
 
   connection.on('close', () => {
     logger.warn('Redis connection closed');
+    isRedisConnected = false;
+  });
+
+  connection.on('reconnecting', () => {
+    logger.info('Redis reconnecting...');
+  });
+
+  connection.on('end', () => {
+    logger.warn('Redis connection ended');
     isRedisConnected = false;
   });
 
@@ -192,17 +202,49 @@ try {
   }
   );
 
-  // Event listeners for the worker
+  // Event listeners for the worker - wrap in try-catch to prevent unhandled rejections
   agentTaskWorker.on('completed', (job) => {
-    logger.info('Job completed', { jobId: job.id });
+    try {
+      logger.info('Job completed', { jobId: job.id });
+    } catch (err) {
+      logger.error('Error in completed handler', { error: err });
+    }
   });
 
   agentTaskWorker.on('failed', (job, err) => {
-    logger.error('Job failed', { jobId: job?.id, error: err });
+    try {
+      logger.error('Job failed', { jobId: job?.id, error: err });
+    } catch (handlerErr) {
+      logger.error('Error in failed handler', { error: handlerErr });
+    }
   });
 
   agentTaskWorker.on('error', (err) => {
-    logger.error('Worker error', { error: err });
+    try {
+      logger.error('Worker error', { 
+        error: err instanceof Error ? err.message : 'Unknown error',
+        errorType: err?.constructor?.name,
+      });
+    } catch (handlerErr) {
+      logger.error('Error in error handler', { error: handlerErr });
+    }
+  });
+
+  // Additional worker event handlers to catch all possible errors
+  agentTaskWorker.on('active', (job) => {
+    try {
+      logger.debug('Job active', { jobId: job.id });
+    } catch (err) {
+      logger.error('Error in active handler', { error: err });
+    }
+  });
+
+  agentTaskWorker.on('stalled', (jobId) => {
+    try {
+      logger.warn('Job stalled', { jobId });
+    } catch (err) {
+      logger.error('Error in stalled handler', { error: err });
+    }
   });
 
   logger.info('BullMQ queue and worker initialized successfully');
