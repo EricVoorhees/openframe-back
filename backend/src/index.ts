@@ -18,6 +18,12 @@ import logsRoutes from './routes/logs.js';
 const app: Express = express();
 
 // ============================================================================
+// Trust Proxy (Required for Render/production deployments)
+// ============================================================================
+// Enable trust proxy so Express can read X-Forwarded-* headers from Render
+app.set('trust proxy', 1);
+
+// ============================================================================
 // Middleware
 // ============================================================================
 

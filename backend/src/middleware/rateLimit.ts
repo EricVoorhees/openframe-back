@@ -55,25 +55,14 @@ redisClient.connect().catch((err) => {
 
 /**
  * Rate limiter for general API endpoints
+ * Using memory store (Redis disabled due to connection issues)
  */
-let apiRateLimiterStore;
-try {
-  apiRateLimiterStore = new RedisStore({
-    // @ts-expect-error - RedisStore types are not fully compatible
-    client: redisClient,
-    prefix: 'rl:api:',
-  });
-} catch (err) {
-  logger.warn('Failed to create Redis store for rate limiter, using memory store', { error: err });
-  apiRateLimiterStore = undefined; // Will use default memory store
-}
-
 export const apiRateLimiter = rateLimit({
   windowMs: config.RATE_LIMIT_WINDOW_MS,
   max: config.RATE_LIMIT_MAX_REQUESTS,
   standardHeaders: true,
   legacyHeaders: false,
-  store: apiRateLimiterStore,
+  // store: undefined, // Use default memory store
   message: {
     error: 'Too Many Requests',
     message: 'Too many requests from this IP, please try again later.',
@@ -86,25 +75,14 @@ export const apiRateLimiter = rateLimit({
 
 /**
  * Stricter rate limiter for agent task creation
+ * Using memory store (Redis disabled)
  */
-let agentTaskRateLimiterStore;
-try {
-  agentTaskRateLimiterStore = new RedisStore({
-    // @ts-expect-error - RedisStore types are not fully compatible
-    client: redisClient,
-    prefix: 'rl:agent:',
-  });
-} catch (err) {
-  logger.warn('Failed to create Redis store for agent task rate limiter', { error: err });
-  agentTaskRateLimiterStore = undefined;
-}
-
 export const agentTaskRateLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
   max: 10, // 10 requests per minute
   standardHeaders: true,
   legacyHeaders: false,
-  store: agentTaskRateLimiterStore,
+  // store: undefined, // Use default memory store
   message: {
     error: 'Too Many Requests',
     message: 'Too many agent task requests, please slow down.',
@@ -118,25 +96,14 @@ export const agentTaskRateLimiter = rateLimit({
 
 /**
  * Very strict rate limiter for expensive operations
+ * Using memory store (Redis disabled)
  */
-let expensiveOperationRateLimiterStore;
-try {
-  expensiveOperationRateLimiterStore = new RedisStore({
-    // @ts-expect-error - RedisStore types are not fully compatible
-    client: redisClient,
-    prefix: 'rl:expensive:',
-  });
-} catch (err) {
-  logger.warn('Failed to create Redis store for expensive operation rate limiter', { error: err });
-  expensiveOperationRateLimiterStore = undefined;
-}
-
 export const expensiveOperationRateLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 50, // 50 requests per hour
   standardHeaders: true,
   legacyHeaders: false,
-  store: expensiveOperationRateLimiterStore,
+  // store: undefined, // Use default memory store
   message: {
     error: 'Rate Limit Exceeded',
     message: 'You have exceeded your hourly quota for this operation.',
