@@ -17,16 +17,29 @@ const router = Router();
  * Analyze development session logs using HumanLayer AI
  */
 router.post('/analyze', async (req: AuthenticatedLogRequest, res: Response) => {
+  const startTime = Date.now();
+  logger.info('[LOGS] Analyze endpoint hit', {
+    hasAuth: !!req.user,
+    userId: req.user?.uid,
+    bodySize: JSON.stringify(req.body).length,
+    headers: {
+      serviceKey: !!req.headers['x-service-key'],
+      auth: !!req.headers.authorization,
+    }
+  });
+
   try {
     // Validate request body
+    logger.debug('[LOGS] Validating request body');
     const logSummary = LogSummarySchema.parse(req.body);
     
     const userId = req.user?.uid;
     if (!userId) {
+      logger.error('[LOGS] No user ID found');
       throw new AppError('User ID is required', 401);
     }
 
-    logger.info('Log analysis requested', {
+    logger.info('[LOGS] Log analysis requested', {
       userId,
       summary_id: logSummary.summary_id,
       session_id: logSummary.session_id,

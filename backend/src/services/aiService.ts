@@ -129,11 +129,26 @@ Focus on error patterns, root causes, and actionable advice. Be concise and tech
   }
 
   /**
+   * Timeout wrapper for AI calls
+   */
+  private async callWithTimeout<T>(promise: Promise<T>, timeoutMs: number = 30000): Promise<T> {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) => 
+        setTimeout(() => reject(new Error(`AI call timeout after ${timeoutMs}ms`)), timeoutMs)
+      ),
+    ]);
+  }
+
+  /**
    * Call AI provider
    */
   private async callAI(prompt: string): Promise<string> {
+    logger.info('Calling AI provider', { provider: this.provider });
     if (this.provider === 'anthropic' && this.anthropic) {
-      const message = await this.anthropic.messages.create({
+      logger.debug('Sending request to Anthropic');
+      const message = await this.callWithTimeout(
+        this.anthropic.messages.create({
         model: 'claude-3-5-sonnet-20241022',
         max_tokens: 1024,
         temperature: 0.3,
@@ -143,7 +158,9 @@ Focus on error patterns, root causes, and actionable advice. Be concise and tech
             content: prompt,
           },
         ],
-      });
+      })
+      );
+      logger.debug('Received response from Anthropic');
 
       const content = message.content[0];
       if (content.type === 'text') {
@@ -151,7 +168,9 @@ Focus on error patterns, root causes, and actionable advice. Be concise and tech
       }
       throw new Error('Unexpected response format from Anthropic');
     } else if (this.provider === 'openai' && this.openai) {
-      const completion = await this.openai.chat.completions.create({
+      logger.debug('Sending request to OpenAI');
+      const completion = await this.callWithTimeout(
+        this.openai.chat.completions.create({
         model: 'gpt-4o',
         messages: [
           {
@@ -166,7 +185,9 @@ Focus on error patterns, root causes, and actionable advice. Be concise and tech
         temperature: 0.3,
         max_tokens: 1024,
         response_format: { type: 'json_object' },
-      });
+      })
+      );
+      logger.debug('Received response from OpenAI');
 
       return completion.choices[0]?.message?.content || '';
     }

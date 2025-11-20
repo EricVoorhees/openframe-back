@@ -127,19 +127,31 @@ export const verifyAuth = async (
   res: Response,
   next: NextFunction
 ): Promise<void> => {
+  logger.info('[AUTH] verifyAuth called', {
+    path: req.path,
+    method: req.method,
+    hasServiceKey: !!req.headers['x-service-key'],
+    hasAuthHeader: !!req.headers.authorization,
+  });
+
   try {
     // Check for service key first (faster)
     const serviceKey = req.headers['x-service-key'];
-    if (serviceKey && serviceKey === config.SERVICE_API_KEY) {
-      // Service key authentication successful
-      req.user = {
-        uid: 'open-frame-service',
-        email: 'service@openframe.dev',
-        emailVerified: true,
-      };
-      logger.debug('Service key authenticated', { uid: req.user.uid });
-      next();
-      return;
+    if (serviceKey) {
+      logger.debug('[AUTH] Service key provided, checking validity');
+      if (serviceKey === config.SERVICE_API_KEY) {
+        // Service key authentication successful
+        req.user = {
+          uid: 'open-frame-service',
+          email: 'service@openframe.dev',
+          emailVerified: true,
+        };
+        logger.info('[AUTH] Service key authenticated successfully', { uid: req.user.uid });
+        next();
+        return;
+      } else {
+        logger.warn('[AUTH] Invalid service key provided');
+      }
     }
 
     // Fall back to Firebase token authentication
@@ -162,6 +174,7 @@ export const verifyAuth = async (
     }
 
     // Verify the Firebase ID token
+    logger.debug('[AUTH] Verifying Firebase token');
     const decodedToken = await admin.auth().verifyIdToken(idToken);
     req.user = {
       uid: decodedToken.uid,
@@ -169,10 +182,14 @@ export const verifyAuth = async (
       emailVerified: decodedToken.email_verified,
     };
 
-    logger.debug('Firebase token authenticated', { userId: req.user.uid });
+    logger.info('[AUTH] Firebase token authenticated successfully', { userId: req.user.uid });
     next();
   } catch (error) {
-    logger.error('Authentication failed', { error });
+    logger.error('[AUTH] Authentication failed', { 
+      error: error instanceof Error ? error.message : 'Unknown error',
+      hasServiceKey: !!req.headers['x-service-key'],
+      hasAuthHeader: !!req.headers.authorization,
+    });
     
     if (error instanceof Error && error.message.includes('expired')) {
       res.status(401).json({
