@@ -224,26 +224,30 @@ and potential bugs. Provide a patch that fixes these issues while maintaining fu
   }
 
   /**
-   * Analyze logs using HumanLayer AI agent
+   * Analyze logs using AI service
+   * Now using direct AI integration for better performance and reliability
    */
   async analyzeLogs(logSummary: any): Promise<any> {
     try {
-      logger.info('Analyzing logs via HumanLayer', {
+      logger.info('Analyzing logs via AI service', {
         summary_id: logSummary.summary_id,
         total_logs: logSummary.total_logs,
         errors: logSummary.error_count,
       });
 
-      // Call the HumanLayer daemon's log analysis endpoint
-      const response = await this.client.post('/rpc/logs.analyze', logSummary);
+      // Import aiService dynamically to avoid circular dependencies
+      const { default: aiService } = await import('./aiService.js');
+      
+      // Call AI service directly
+      const response = await aiService.analyzeLogs(logSummary);
       
       logger.info('Log analysis completed', {
         summary_id: logSummary.summary_id,
-        narrative_length: response.data.narrative?.length || 0,
-        insights_count: response.data.key_insights?.length || 0,
+        narrative_length: response.narrative?.length || 0,
+        insights_count: response.key_insights?.length || 0,
       });
 
-      return response.data;
+      return response;
     } catch (error) {
       logger.error('Failed to analyze logs', { error });
       throw new AppError('Failed to analyze logs', 500);

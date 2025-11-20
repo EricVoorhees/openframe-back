@@ -118,5 +118,76 @@ export const verifyServiceKey = (
   }
 };
 
-export default { verifyFirebaseToken, verifyServiceKey };
+/**
+ * Middleware to verify either Firebase token OR service key
+ * Useful for endpoints that need to support both web users and desktop apps
+ */
+export const verifyAuth = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    // Check for service key first (faster)
+    const serviceKey = req.headers['x-service-key'];
+    if (serviceKey && serviceKey === config.SERVICE_API_KEY) {
+      // Service key authentication successful
+      req.user = {
+        uid: 'open-frame-service',
+        email: 'service@openframe.dev',
+        emailVerified: true,
+      };
+      logger.debug('Service key authenticated', { uid: req.user.uid });
+      next();
+      return;
+    }
+
+    // Fall back to Firebase token authentication
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Missing authorization. Provide either X-Service-Key or Bearer token.',
+      });
+      return;
+    }
+
+    const idToken = authHeader.split('Bearer ')[1];
+    if (!idToken) {
+      res.status(401).json({
+        error: 'Unauthorized',
+        message: 'No token provided',
+      });
+      return;
+    }
+
+    // Verify the Firebase ID token
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    req.user = {
+      uid: decodedToken.uid,
+      email: decodedToken.email,
+      emailVerified: decodedToken.email_verified,
+    };
+
+    logger.debug('Firebase token authenticated', { userId: req.user.uid });
+    next();
+  } catch (error) {
+    logger.error('Authentication failed', { error });
+    
+    if (error instanceof Error && error.message.includes('expired')) {
+      res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Token has expired',
+      });
+      return;
+    }
+
+    res.status(401).json({
+      error: 'Unauthorized',
+      message: 'Invalid authentication credentials',
+    });
+  }
+};
+
+export default { verifyFirebaseToken, verifyServiceKey, verifyAuth };
 

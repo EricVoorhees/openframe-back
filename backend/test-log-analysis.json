@@ -1,0 +1,76 @@
+{
+  "summary_id": "sum_test_001",
+  "session_id": "sess_test_001",
+  "total_logs": 1247,
+  "error_count": 38,
+  "warn_count": 102,
+  "unique_errors": [
+    {
+      "error_type": "TypeError",
+      "message": "Cannot read property 'x' of undefined",
+      "count": 23,
+      "frequency_pattern": "Every ~3 seconds, increasing"
+    },
+    {
+      "error_type": "NetworkError",
+      "message": "Failed to fetch /api/data",
+      "count": 12,
+      "frequency_pattern": "Clustered burst at 14:32:15"
+    },
+    {
+      "error_type": "ReferenceError",
+      "message": "useState is not defined",
+      "count": 3,
+      "frequency_pattern": "Isolated incidents"
+    }
+  ],
+  "critical_logs": [
+    {
+      "timestamp": "2024-11-19T14:32:15.234Z",
+      "level": "error",
+      "message": "TypeError: Cannot read property 'x' of undefined at UserProfile.render",
+      "frame_name": "UserProfile.tsx"
+    },
+    {
+      "timestamp": "2024-11-19T14:32:18.567Z",
+      "level": "error",
+      "message": "NetworkError: Failed to fetch /api/data - timeout after 5000ms",
+      "frame_name": "Dashboard.tsx"
+    },
+    {
+      "timestamp": "2024-11-19T14:32:21.123Z",
+      "level": "error",
+      "message": "TypeError: Cannot read property 'x' of undefined at UserProfile.render",
+      "frame_name": "UserProfile.tsx"
+    },
+    {
+      "timestamp": "2024-11-19T14:32:24.789Z",
+      "level": "error",
+      "message": "TypeError: Cannot read property 'x' of undefined at UserProfile.render",
+      "frame_name": "UserProfile.tsx"
+    },
+    {
+      "timestamp": "2024-11-19T14:32:27.456Z",
+      "level": "warn",
+      "message": "Slow component render: UserProfile took 1523ms",
+      "frame_name": "UserProfile.tsx"
+    }
+  ],
+  "network_summary": {
+    "total_requests": 87,
+    "success_rate": 78.2,
+    "failed_requests": 19
+  },
+  "performance_alerts": [
+    {
+      "severity": "high",
+      "message": "Slow render in UserProfile component",
+      "duration_ms": 1523.4
+    },
+    {
+      "severity": "medium",
+      "message": "Large bundle size for Dashboard chunk",
+      "duration_ms": 856.2
+    }
+  ]
+}

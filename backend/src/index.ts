@@ -4,7 +4,7 @@ import helmet from 'helmet';
 import config from './config/index.js';
 import logger from './utils/logger.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
-import { verifyFirebaseToken } from './middleware/auth.js';
+import { verifyFirebaseToken, verifyAuth } from './middleware/auth.js';
 import { apiRateLimiter, agentTaskRateLimiter } from './middleware/rateLimit.js';
 
 // Import routes
@@ -58,7 +58,8 @@ app.use('/api/webhooks', webhookRoutes);
 // API routes (with auth and rate limiting)
 app.use('/api/agent', apiRateLimiter, agentTaskRateLimiter, verifyFirebaseToken, agentRoutes);
 app.use('/api/projects', apiRateLimiter, verifyFirebaseToken, projectRoutes);
-app.use('/api/logs', apiRateLimiter, verifyFirebaseToken, logsRoutes);
+// Logs endpoint supports both Firebase token AND service key (for desktop apps)
+app.use('/api/logs', apiRateLimiter, verifyAuth, logsRoutes);
 
 // Admin routes (service key auth only, no Firebase token needed)
 app.use('/api/admin', adminRoutes);
